@@ -58,7 +58,11 @@ def login_user(payload: LoginRequest, db: DatabaseSession) -> AuthResponse:
         )
 
     return AuthResponse(
-        access_token=create_access_token(subject=str(user.id), role=user.role),
+        access_token=create_access_token(
+            subject=str(user.id),
+            role=user.role,
+            org_id=user.organization_id,
+        ),
         token_type="bearer",
         user=user,
     )
