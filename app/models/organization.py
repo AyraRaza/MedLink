@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.biomedical_resource import BiomedicalResource
     from app.models.user import User
 
 
@@ -50,3 +51,6 @@ class Organization(Base):
     )
 
     users: Mapped[list["User"]] = relationship(back_populates="organization")
+    biomedical_resources: Mapped[list["BiomedicalResource"]] = relationship(
+        back_populates="organization"
+    )
