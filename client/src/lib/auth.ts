@@ -17,6 +17,12 @@ type AuthResponse = {
   user: User;
 };
 
+export type Registration = {
+  email: string;
+  password: string;
+  full_name: string;
+};
+
 export function getAccessToken() {
   return window.localStorage.getItem(ACCESS_TOKEN_KEY);
 }
@@ -33,6 +39,11 @@ export async function login(email: string, password: string) {
   const { data } = await apiClient.post<AuthResponse>("/auth/login", { email, password });
   setAccessToken(data.access_token);
   return data.user;
+}
+
+export async function registerUser(payload: Registration) {
+  const { data } = await apiClient.post<User>("/auth/register", payload);
+  return data;
 }
 
 export async function getCurrentUser() {
