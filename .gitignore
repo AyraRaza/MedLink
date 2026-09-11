@@ -5,3 +5,8 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Frontend / build artifacts
+node_modules/
+dist/
+.manus-logs/

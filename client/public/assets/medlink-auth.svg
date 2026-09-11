@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 440" role="img" aria-labelledby="title desc">
+  <title id="title">Connected healthcare illustration</title>
+  <desc id="desc">A soft pastel healthcare cross linked to care points.</desc>
+  <g fill="none" stroke="#c8b8f2" stroke-linecap="round" stroke-width="4" opacity=".78">
+    <path d="M260 220 122 100M260 220l140-111M260 220l-92 139M260 220l111 139"/>
+  </g>
+  <g fill="#f1d9df" stroke="#c8b8f2" stroke-width="4">
+    <circle cx="122" cy="100" r="22"/><circle cx="400" cy="109" r="22"/>
+    <circle cx="168" cy="359" r="22"/><circle cx="371" cy="359" r="22"/>
+  </g>
+  <rect x="193" y="153" width="134" height="134" rx="35" fill="#dbe8f0" stroke="#c8b8f2" stroke-width="5"/>
+  <path d="M244 174h32v30h30v32h-30v30h-32v-30h-30v-32h30v-30Z" fill="#75659a"/>
+  <circle cx="122" cy="100" r="7" fill="#75659a"/><circle cx="400" cy="109" r="7" fill="#75659a"/>
+  <circle cx="168" cy="359" r="7" fill="#75659a"/><circle cx="371" cy="359" r="7" fill="#75659a"/>
+</svg>

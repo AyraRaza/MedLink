@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" role="img" aria-labelledby="title desc">
+  <title id="title">Connected healthcare network</title>
+  <desc id="desc">Soft pastel hospital and healthcare network illustration.</desc>
+  <g fill="none" stroke="#75659a" stroke-linecap="round" stroke-width="5" opacity=".58">
+    <path d="M102 202 235 112l128 72 118-98 137 75"/>
+    <path d="m235 112 24 111M363 184l-18 55M481 86l12 139M618 161l-33 70"/>
+  </g>
+  <g fill="#f4d8df" stroke="#75659a" stroke-width="4">
+    <circle cx="102" cy="202" r="18"/>
+    <circle cx="235" cy="112" r="21"/>
+    <circle cx="363" cy="184" r="19"/>
+    <circle cx="481" cy="86" r="23"/>
+    <circle cx="618" cy="161" r="20"/>
+  </g>
+  <g fill="#dbe8f0" stroke="#75659a" stroke-width="4">
+    <path d="M275 226h76v-63h-76v63Zm10-63v-23h56v23"/>
+    <path d="M464 225h58v-72h-58v72Zm17-72v-20h24v20"/>
+  </g>
+  <path d="M301 184h25M313 171v26M485 184h16M493 176v16" stroke="#75659a" stroke-width="5" stroke-linecap="round"/>
+  <g fill="#c8b8f2">
+    <circle cx="167" cy="253" r="9"/><circle cx="405" cy="254" r="12"/><circle cx="568" cy="245" r="8"/>
+  </g>
+</svg>
