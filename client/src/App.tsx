@@ -7,6 +7,8 @@ import {
   Stethoscope, Syringe, X, Zap
 } from "lucide-react";
 import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api";
+import { clearAccessToken, getAccessToken, getCurrentUser, login } from "@/lib/auth";
 
 const logo = "/assets/medlink-logo.svg";
 const networkArt = "/assets/medlink-network.svg";
@@ -44,7 +46,7 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`status-pill ${styles[status] || "bg-[#ececed] text-[#666]"}`}><span className="status-dot" />{status}</span>;
 }
 
-function Sidebar({ view, setView, mobileOpen, setMobileOpen }: { view: View; setView: (v: View) => void; mobileOpen: boolean; setMobileOpen: (v: boolean) => void }) {
+function Sidebar({ view, setView, mobileOpen, setMobileOpen, onLogout }: { view: View; setView: (v: View) => void; mobileOpen: boolean; setMobileOpen: (v: boolean) => void; onLogout: () => void }) {
   return <>
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
       <div className="brand" onClick={() => { setView("dashboard"); setMobileOpen(false); }}>
@@ -53,7 +55,7 @@ function Sidebar({ view, setView, mobileOpen, setMobileOpen }: { view: View; set
       <div className="workspace"><div className="workspace-avatar">AH</div><div><strong>Ardent Health</strong><small>Healthcare Network</small></div><ChevronRight size={15} /></div>
       <div className="nav-group"><small className="nav-caption">WORKSPACE</small>{nav.map(item => { const Icon = item.icon; return <button key={item.id} className={`nav-item ${view === item.id || (view === "add" && item.id === "inventory") ? "active" : ""}`} onClick={() => { setView(item.id); setMobileOpen(false); }}><Icon size={18} /><span>{item.label}</span>{item.id === "inventory" && <span className="nav-count">5</span>}</button> })}</div>
       <div className="rail-note"><Sparkles size={16} /><p><strong>Keep critical resources in view.</strong><br />Your inventory is in good standing.</p></div>
-      <div className="sidebar-bottom"><button className="nav-item" onClick={() => toast.info("Help center is coming soon.")}><CircleHelp size={18} /><span>Help center</span></button><button className="nav-item" onClick={() => { setView("login"); setMobileOpen(false); }}><LogOut size={18} /><span>Log out</span></button><div className="rail-user"><div className="avatar">JD</div><div><strong>Jordan Davis</strong><small>Inventory admin</small></div><Settings size={15} /></div></div>
+      <div className="sidebar-bottom"><button className="nav-item" onClick={() => toast.info("Help center is coming soon.")}><CircleHelp size={18} /><span>Help center</span></button><button className="nav-item" onClick={onLogout}><LogOut size={18} /><span>Log out</span></button><div className="rail-user"><div className="avatar">JD</div><div><strong>Jordan Davis</strong><small>Inventory admin</small></div><Settings size={15} /></div></div>
     </aside>
     {mobileOpen && <div className="mobile-scrim" onClick={() => setMobileOpen(false)} />}
   </>;
@@ -81,8 +83,32 @@ function Organization({ setView }: { setView: (v: View) => void }) { return <div
 
 function SettingsPage({ setView }: { setView: (v: View) => void }) { return <div className="page"><Topbar title="Settings" setView={setView} setMobileOpen={() => {}} /><main className="page-content"><div className="form-intro"><p className="section-kicker">ACCOUNT & PREFERENCES</p><h2>Settings</h2><p className="muted">Manage your profile and notification preferences.</p></div><div className="settings-grid"><section className="card settings-card"><p className="section-kicker">PROFILE INFORMATION</p><div className="profile-large"><div className="avatar avatar-lg">JD</div><div><h3>Jordan Davis</h3><p className="muted">Inventory admin</p></div><button className="button secondary small" onClick={() => toast.info("Profile editing is coming soon.")}>Edit</button></div>{[["Full name","Jordan Davis"],["Email","jordan.davis@ardenthealth.org"],["Role","Inventory administrator"]].map(([a,b]) => <div className="info-line" key={a}><span>{a}</span><strong>{b}</strong></div>)}</section><section className="card settings-card"><p className="section-kicker">ACCOUNT SETTINGS</p><div className="setting-row"><div><strong>Email notifications</strong><span>Receive updates about low stock</span></div><div className="toggle on"><span /></div></div><div className="setting-row"><div><strong>Weekly inventory digest</strong><span>A Monday summary for your network</span></div><div className="toggle on"><span /></div></div><div className="setting-row"><div><strong>Security alerts</strong><span>Important access and profile changes</span></div><div className="toggle on"><span /></div></div></section></div></main></div>; }
 
-function Login({ setView }: { setView: (v: View) => void }) { return <div className="auth-page"><div className="auth-visual"><div className="auth-brand"><div className="brand-mark"><img src={logo} alt="" /></div><span>MEDLINK</span></div><div className="auth-art"><img src={authArt} alt="Connected medical cross illustration" /></div><div className="auth-quote"><p>“Clarity is care in motion.”</p><span>MedLink for verified healthcare organizations.</span></div></div><div className="auth-form"><div className="auth-form-inner"><p className="section-kicker">WELCOME BACK</p><h1>Sign in to MedLink.</h1><p className="muted">Manage what matters across your healthcare network.</p><label>Email address<input defaultValue="jordan.davis@ardenthealth.org" /></label><label>Password<input type="password" defaultValue="password" /></label><div className="form-inline"><label className="check"><input type="checkbox" defaultChecked /> Remember me</label><button className="text-button" onClick={() => toast.info("Password reset is coming soon.")}>Forgot password?</button></div><button className="button primary full" onClick={() => setView("dashboard")}>Sign in <ChevronRight size={17} /></button><p className="auth-switch">New to MedLink? <button onClick={() => setView("onboarding")}>Create an account</button></p></div></div></div>; }
+function Login({ setView }: { setView: (v: View) => void }) {
+  const [email, setEmail] = useState("jordan.davis@ardenthealth.org");
+  const [password, setPassword] = useState("password");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password) {
+      toast.error("Enter your email and password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await login(email, password);
+      toast.success("Welcome back.");
+      setView("dashboard");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Unable to sign in. Please try again."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return <div className="auth-page"><div className="auth-visual"><div className="auth-brand"><div className="brand-mark"><img src={logo} alt="" /></div><span>MEDLINK</span></div><div className="auth-art"><img src={authArt} alt="Connected medical cross illustration" /></div><div className="auth-quote"><p>“Clarity is care in motion.”</p><span>MedLink for verified healthcare organizations.</span></div></div><div className="auth-form"><div className="auth-form-inner"><p className="section-kicker">WELCOME BACK</p><h1>Sign in to MedLink.</h1><p className="muted">Manage what matters across your healthcare network.</p><label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label><label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><div className="form-inline"><label className="check"><input type="checkbox" defaultChecked /> Remember me</label><button className="text-button" onClick={() => toast.info("Password reset is coming soon.")}>Forgot password?</button></div><button className="button primary full" disabled={isSubmitting} aria-busy={isSubmitting} onClick={handleLogin}>{isSubmitting ? "Signing in..." : "Sign in"} <ChevronRight size={17} /></button><p className="auth-switch">New to MedLink? <button onClick={() => setView("onboarding")}>Create an account</button></p></div></div></div>;
+}
 
 function Onboarding({ setView }: { setView: (v: View) => void }) { return <div className="auth-page"><div className="auth-visual onboarding-visual"><div className="auth-brand"><div className="brand-mark"><img src={logo} alt="" /></div><span>MEDLINK</span></div><div className="onboarding-copy"><p className="section-kicker">STEP 02 / ORGANIZATION</p><h1>Bring your organization into view.</h1><p>Verified healthcare teams use MedLink to keep biomedical resources clear, current, and ready.</p><div className="onboarding-steps"><span className="done">01</span><span className="line" /><span className="current">02</span><span className="line" /><span>03</span></div></div></div><div className="auth-form"><div className="auth-form-inner"><p className="section-kicker">REGISTER ORGANIZATION</p><h1>Tell us about your team.</h1><p className="muted">We’ll review these details before activating your workspace.</p><div className="form-grid compact"><label className="wide">Organization name<input placeholder="e.g. Ardent Health Network" /></label><label>Registration number<input placeholder="Registration ID" /></label><label>Organization type<select defaultValue=""><option value="" disabled>Select type</option><option>Hospital</option><option>Healthcare network</option><option>Diagnostic center</option></select></label><label className="wide">Work email<input placeholder="operations@organization.org" /></label></div><button className="button primary full" onClick={() => { toast.success("Organization submitted for verification."); setView("dashboard"); }}>Submit for verification <ChevronRight size={17} /></button><p className="auth-switch">Already have an account? <button onClick={() => setView("login")}>Sign in</button></p></div></div></div>; }
 
-export default function App() { const [view, setView] = useState<View>("dashboard"); const [mobileOpen, setMobileOpen] = useState(false); useEffect(() => { const openNav = () => setMobileOpen(true); window.addEventListener("medlink:open-nav", openNav); return () => window.removeEventListener("medlink:open-nav", openNav); }, []); const content = view === "dashboard" ? <Dashboard setView={setView} /> : view === "inventory" ? <Inventory setView={setView} /> : view === "resource" ? <ResourceDetail setView={setView} /> : view === "add" ? <AddResource setView={setView} /> : view === "organization" ? <Organization setView={setView} /> : view === "settings" ? <SettingsPage setView={setView} /> : view === "login" ? <Login setView={setView} /> : <Onboarding setView={setView} />; return view === "login" || view === "onboarding" ? content : <div className="app-shell"><Sidebar view={view} setView={setView} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />{content}</div>; }
+export default function App() { const [view, setView] = useState<View>("login"); const [mobileOpen, setMobileOpen] = useState(false); useEffect(() => { const openNav = () => setMobileOpen(true); window.addEventListener("medlink:open-nav", openNav); return () => window.removeEventListener("medlink:open-nav", openNav); }, []); useEffect(() => { if (!getAccessToken()) return; getCurrentUser().then(() => setView("dashboard")).catch(() => { clearAccessToken(); setView("login"); }); }, []); const handleLogout = () => { clearAccessToken(); setView("login"); setMobileOpen(false); toast.success("You have been signed out."); }; const content = view === "dashboard" ? <Dashboard setView={setView} /> : view === "inventory" ? <Inventory setView={setView} /> : view === "resource" ? <ResourceDetail setView={setView} /> : view === "add" ? <AddResource setView={setView} /> : view === "organization" ? <Organization setView={setView} /> : view === "settings" ? <SettingsPage setView={setView} /> : view === "login" ? <Login setView={setView} /> : <Onboarding setView={setView} />; return view === "login" || view === "onboarding" ? content : <div className="app-shell"><Sidebar view={view} setView={setView} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} onLogout={handleLogout} />{content}</div>; }

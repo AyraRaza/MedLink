@@ -1,0 +1,41 @@
+import { apiClient } from "./api";
+
+const ACCESS_TOKEN_KEY = "medlink_access_token";
+
+export type User = {
+  id: number;
+  email: string;
+  full_name: string;
+  role: "admin" | "hospital_staff";
+  is_active: boolean;
+  created_at: string;
+};
+
+type AuthResponse = {
+  access_token: string;
+  token_type: "bearer";
+  user: User;
+};
+
+export function getAccessToken() {
+  return window.localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function setAccessToken(token: string) {
+  window.localStorage.setItem(ACCESS_TOKEN_KEY, token);
+}
+
+export function clearAccessToken() {
+  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+export async function login(email: string, password: string) {
+  const { data } = await apiClient.post<AuthResponse>("/auth/login", { email, password });
+  setAccessToken(data.access_token);
+  return data.user;
+}
+
+export async function getCurrentUser() {
+  const { data } = await apiClient.get<User>("/auth/me");
+  return data;
+}
