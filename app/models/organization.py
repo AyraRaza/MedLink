@@ -8,6 +8,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.biomedical_resource import BiomedicalResource
+    from app.models.resource_request import ResourceRequest
     from app.models.user import User
 
 
@@ -53,4 +54,12 @@ class Organization(Base):
     users: Mapped[list["User"]] = relationship(back_populates="organization")
     biomedical_resources: Mapped[list["BiomedicalResource"]] = relationship(
         back_populates="organization"
+    )
+    outgoing_resource_requests: Mapped[list["ResourceRequest"]] = relationship(
+        foreign_keys="ResourceRequest.requesting_organization_id",
+        back_populates="requesting_organization",
+    )
+    incoming_resource_requests: Mapped[list["ResourceRequest"]] = relationship(
+        foreign_keys="ResourceRequest.providing_organization_id",
+        back_populates="providing_organization",
     )

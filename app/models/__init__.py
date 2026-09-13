@@ -1,5 +1,12 @@
 from app.models.biomedical_resource import BiomedicalResource
 from app.models.organization import Organization
+from app.models.resource_request import ResourceRequest, ResourceRequestStatus
 from app.models.user import User
 
-__all__ = ["User", "Organization", "BiomedicalResource"]
+__all__ = [
+	"User",
+	"Organization",
+	"BiomedicalResource",
+	"ResourceRequest",
+	"ResourceRequestStatus",
+]

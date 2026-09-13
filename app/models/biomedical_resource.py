@@ -11,6 +11,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.organization import Organization
+    from app.models.resource_request import ResourceRequest
 
 
 class ResourceCategory(str, Enum):
@@ -91,6 +92,7 @@ class BiomedicalResource(Base):
     )
 
     organization: Mapped["Organization"] = relationship(back_populates="biomedical_resources")
+    requests: Mapped[list["ResourceRequest"]] = relationship(back_populates="resource")
 
     @validates("quantity")
     def validate_quantity(self, key: str, value: int) -> int:

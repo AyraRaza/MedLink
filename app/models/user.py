@@ -8,6 +8,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.organization import Organization
+    from app.models.resource_request import ResourceRequest
 
 
 class User(Base):
@@ -41,4 +42,7 @@ class User(Base):
 
     organization: Mapped["Organization | None"] = relationship(
         back_populates="users",
+    )
+    resource_requests: Mapped[list["ResourceRequest"]] = relationship(
+        back_populates="requesting_user",
     )
