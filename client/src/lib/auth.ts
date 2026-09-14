@@ -24,20 +24,24 @@ export type Registration = {
 };
 
 export function getAccessToken() {
-  return window.localStorage.getItem(ACCESS_TOKEN_KEY);
+  return window.localStorage.getItem(ACCESS_TOKEN_KEY) || window.sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
-export function setAccessToken(token: string) {
-  window.localStorage.setItem(ACCESS_TOKEN_KEY, token);
+export function setAccessToken(token: string, rememberMe = true) {
+  const storage = rememberMe ? window.localStorage : window.sessionStorage;
+  const otherStorage = rememberMe ? window.sessionStorage : window.localStorage;
+  otherStorage.removeItem(ACCESS_TOKEN_KEY);
+  storage.setItem(ACCESS_TOKEN_KEY, token);
 }
 
 export function clearAccessToken() {
   window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
 }
 
-export async function login(email: string, password: string) {
+export async function login(email: string, password: string, rememberMe = true) {
   const { data } = await apiClient.post<AuthResponse>("/auth/login", { email, password });
-  setAccessToken(data.access_token);
+  setAccessToken(data.access_token, rememberMe);
   return data.user;
 }
 

@@ -8,7 +8,7 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = window.localStorage.getItem("medlink_access_token");
+  const token = window.localStorage.getItem("medlink_access_token") || window.sessionStorage.getItem("medlink_access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
