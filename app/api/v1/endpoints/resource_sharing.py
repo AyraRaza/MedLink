@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.v1.dependencies import CurrentUser
@@ -85,10 +85,14 @@ def _get_visible_request(
 
 
 def _require_pending(resource_request: ResourceRequest) -> None:
-    if resource_request.status != ResourceRequestStatus.PENDING.value:
+    _require_status(resource_request, ResourceRequestStatus.PENDING)
+
+
+def _require_status(resource_request: ResourceRequest, expected_status: ResourceRequestStatus) -> None:
+    if resource_request.status != expected_status.value:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only pending resource requests can change status",
+            detail=f"Only {expected_status.value.lower()} resource requests can change status",
         )
 
 
@@ -345,6 +349,130 @@ def cancel_resource_request(
     _require_pending(resource_request)
     resource_request.status = ResourceRequestStatus.CANCELLED.value
     resource_request.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(resource_request)
+    return _request_to_response(resource_request)
+
+
+@router.post(
+    "/resource-requests/{request_id}/fulfill",
+    response_model=ResourceRequestResponse,
+)
+def fulfill_resource_request(
+    request_id: int,
+    current_user: CurrentUser,
+    db: DatabaseSession,
+) -> ResourceRequestResponse:
+    organization = _require_verified_organization(current_user)
+    resource_request = _get_visible_request(db, request_id, organization.id)
+    if resource_request.providing_organization_id != organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the providing organization can fulfill this request",
+        )
+    _require_status(resource_request, ResourceRequestStatus.APPROVED)
+
+    resource = _load_resource_for_request(db, resource_request.resource_id)
+    if not resource.organization.is_active or resource.organization.verification_status != "VERIFIED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resource provider is not active and verified",
+        )
+
+    try:
+        quantity_update = db.execute(
+            update(BiomedicalResource)
+            .where(
+                BiomedicalResource.id == resource_request.resource_id,
+                BiomedicalResource.is_active.is_(True),
+                BiomedicalResource.quantity >= resource_request.requested_quantity,
+                BiomedicalResource.availability_status.in_(
+                    [
+                        AvailabilityStatus.AVAILABLE.value,
+                        AvailabilityStatus.LOW_STOCK.value,
+                    ]
+                ),
+            )
+            .values(
+                quantity=BiomedicalResource.quantity - resource_request.requested_quantity,
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+        if quantity_update.rowcount != 1:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Resource is no longer available for fulfillment",
+            )
+
+        request_update = db.execute(
+            update(ResourceRequest)
+            .where(
+                ResourceRequest.id == request_id,
+                ResourceRequest.status == ResourceRequestStatus.APPROVED.value,
+            )
+            .values(
+                status=ResourceRequestStatus.FULFILLED.value,
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+        if request_update.rowcount != 1:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only approved resource requests can be fulfilled",
+            )
+
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to fulfill resource request",
+        ) from None
+
+    db.refresh(resource_request)
+    return _request_to_response(resource_request)
+
+
+@router.post(
+    "/resource-requests/{request_id}/receive",
+    response_model=ResourceRequestResponse,
+)
+def receive_resource_request(
+    request_id: int,
+    current_user: CurrentUser,
+    db: DatabaseSession,
+) -> ResourceRequestResponse:
+    organization = _require_verified_organization(current_user)
+    resource_request = _get_visible_request(db, request_id, organization.id)
+    if resource_request.requesting_organization_id != organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the requesting organization can confirm receipt",
+        )
+    _require_status(resource_request, ResourceRequestStatus.FULFILLED)
+
+    receipt_update = db.execute(
+        update(ResourceRequest)
+        .where(
+            ResourceRequest.id == request_id,
+            ResourceRequest.status == ResourceRequestStatus.FULFILLED.value,
+        )
+        .values(
+            status=ResourceRequestStatus.RECEIVED.value,
+            updated_at=datetime.now(timezone.utc),
+        )
+    )
+    if receipt_update.rowcount != 1:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only fulfilled resource requests can be received",
+        )
+
     db.commit()
     db.refresh(resource_request)
     return _request_to_response(resource_request)

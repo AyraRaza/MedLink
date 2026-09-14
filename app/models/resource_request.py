@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 class ResourceRequestStatus(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
+    FULFILLED = "FULFILLED"
+    RECEIVED = "RECEIVED"
     REJECTED = "REJECTED"
     CANCELLED = "CANCELLED"
 
