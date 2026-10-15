@@ -1,13 +1,15 @@
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select, update
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.security import create_refresh_token, verify_password
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.models import User
 
 
 test_id = uuid4().hex
@@ -85,6 +87,70 @@ try:
             user_headers[key] = {
                 "Authorization": f"Bearer {login.json()['access_token']}"
             }
+
+        duplicate_registration = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": emails["org_a"].upper(),
+                "password": password,
+                "full_name": "Duplicate Org A User",
+            },
+        )
+        assert duplicate_registration.status_code == 409, duplicate_registration.text
+
+        for invalid_registration in (
+            {},
+            {"email": "not-an-email", "password": password, "full_name": "Invalid"},
+            {"email": emails["org_a"], "password": "short", "full_name": "Short"},
+            {
+                "email": emails["org_a"],
+                "password": "x" * 73,
+                "full_name": "Too long password",
+            },
+        ):
+            response = client.post("/api/v1/auth/register", json=invalid_registration)
+            assert response.status_code == 422, response.text
+
+        with SessionLocal() as db:
+            registered_user = db.scalar(
+                select(User).where(User.email == emails["org_a"])
+            )
+            assert registered_user is not None
+            assert registered_user.password_hash != password
+            assert verify_password(password, registered_user.password_hash)
+
+        for invalid_login in (
+            {"email": emails["org_a"], "password": "WrongPassword123!"},
+            {"email": f"missing-{test_id}@example.com", "password": password},
+        ):
+            response = client.post("/api/v1/auth/login", json=invalid_login)
+            assert response.status_code == 401, response.text
+
+        for invalid_login in (
+            {},
+            {"email": "not-an-email", "password": password},
+            {"email": emails["org_a"], "password": ""},
+        ):
+            response = client.post("/api/v1/auth/login", json=invalid_login)
+            assert response.status_code == 422, response.text
+
+        assert client.get("/api/v1/auth/me").status_code == 401
+        assert client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": "Bearer not-a-valid-token"},
+        ).status_code == 401
+        assert client.get(
+            "/api/v1/auth/me",
+            headers={
+                "Authorization": f"Bearer {create_refresh_token(str(1))}"
+            },
+        ).status_code == 401
+        authenticated_user = client.get(
+            "/api/v1/auth/me",
+            headers=user_headers["org_a"],
+        )
+        assert authenticated_user.status_code == 200, authenticated_user.text
+        assert authenticated_user.json()["email"] == emails["org_a"]
 
         organization_payloads = {
             "org_a": {
@@ -245,6 +311,23 @@ try:
         health = client.get("/health")
         assert health.status_code == 200, health.text
         assert health.json()["status"] == "ok"
+
+    with SessionLocal() as db:
+        db.execute(
+            update(User)
+            .where(User.email == emails["no_org"])
+            .values(is_active=False)
+        )
+        db.commit()
+    inactive_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": emails["no_org"], "password": password},
+    )
+    assert inactive_login.status_code == 403, inactive_login.text
+    assert client.get(
+        "/api/v1/auth/me",
+        headers=user_headers["no_org"],
+    ).status_code == 403
 
     print("Phase 3 smoke test passed")
 finally:
