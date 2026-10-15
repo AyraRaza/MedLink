@@ -42,6 +42,7 @@ users = [
     User(email="beta@example.com", password_hash="test", full_name="Beta", organization_id=organizations[1].id),
     User(email="other@example.com", password_hash="test", full_name="Other", organization_id=organizations[2].id),
     User(email="pending@example.com", password_hash="test", full_name="Pending", organization_id=organizations[3].id),
+    User(email="admin@example.com", password_hash="test", full_name="Admin", role="admin"),
 ]
 db.add_all(users)
 db.flush()
@@ -85,6 +86,7 @@ alpha_headers = headers(users[0])
 beta_headers = headers(users[1])
 other_headers = headers(users[2])
 pending_headers = headers(users[3])
+admin_headers = headers(users[4])
 
 try:
     discovery = client.get("/api/v1/resource-sharing/resources", headers=alpha_headers)
@@ -227,6 +229,30 @@ try:
     assert client.get(
         "/api/v1/resource-sharing/resources", headers=pending_headers
     ).status_code == 403
+
+    pending_verification = client.patch(
+        f"/api/v1/organizations/{organizations[3].id}/verify",
+        headers=pending_headers,
+        json={"verification_status": "VERIFIED"},
+    )
+    assert pending_verification.status_code == 403, pending_verification.text
+    assert db.get(Organization, organizations[3].id).verification_status == "PENDING"
+
+    verification = client.patch(
+        f"/api/v1/organizations/{organizations[3].id}/verify",
+        headers=admin_headers,
+        json={"verification_status": "VERIFIED"},
+    )
+    assert verification.status_code == 200, verification.text
+    assert verification.json()["verification_status"] == "VERIFIED"
+
+    repeated_verification = client.patch(
+        f"/api/v1/organizations/{organizations[3].id}/verify",
+        headers=admin_headers,
+        json={"verification_status": "REJECTED"},
+    )
+    assert repeated_verification.status_code == 400, repeated_verification.text
+    assert db.get(Organization, organizations[3].id).verification_status == "VERIFIED"
 
     print("Phase 5B smoke test passed")
 finally:
