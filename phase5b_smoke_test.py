@@ -43,6 +43,8 @@ users = [
     User(email="other@example.com", password_hash="test", full_name="Other", organization_id=organizations[2].id),
     User(email="pending@example.com", password_hash="test", full_name="Pending", organization_id=organizations[3].id),
     User(email="admin@example.com", password_hash="test", full_name="Admin", role="admin"),
+    User(email="unassigned@example.com", password_hash="test", full_name="Unassigned"),
+    User(email="admin-target@example.com", password_hash="test", full_name="Admin target"),
 ]
 db.add_all(users)
 db.flush()
@@ -73,6 +75,8 @@ def override_db():
     yield db
 
 
+previous_get_db_override = app.dependency_overrides.get(get_db)
+had_get_db_override = get_db in app.dependency_overrides
 app.dependency_overrides[get_db] = override_db
 client = TestClient(app)
 
@@ -89,6 +93,71 @@ pending_headers = headers(users[3])
 admin_headers = headers(users[4])
 
 try:
+    members_path = f"/api/v1/organizations/{organizations[0].id}/members"
+
+    assert client.post(
+        members_path, json={"user_id": users[5].id}
+    ).status_code == 401
+
+    cross_org_membership = client.post(
+        members_path,
+        headers=beta_headers,
+        json={"user_id": users[5].id},
+    )
+    assert cross_org_membership.status_code == 403
+    assert db.get(User, users[5].id).organization_id is None
+
+    own_membership = client.post(
+        members_path,
+        headers=alpha_headers,
+        json={"user_id": users[5].id},
+    )
+    assert own_membership.status_code == 200, own_membership.text
+    assert db.get(User, users[5].id).organization_id == organizations[0].id
+
+    admin_membership = client.post(
+        members_path,
+        headers=admin_headers,
+        json={"user_id": users[6].id},
+    )
+    assert admin_membership.status_code == 200, admin_membership.text
+    assert db.get(User, users[6].id).organization_id == organizations[0].id
+
+    other_organization_member = client.post(
+        members_path,
+        headers=alpha_headers,
+        json={"user_id": users[1].id},
+    )
+    assert other_organization_member.status_code == 409
+    assert db.get(User, users[1].id).organization_id == organizations[1].id
+
+    missing_member = client.post(
+        members_path,
+        headers=alpha_headers,
+        json={"user_id": 99999},
+    )
+    assert missing_member.status_code == 404
+    assert client.post(
+        f"/api/v1/organizations/99999/members",
+        headers=alpha_headers,
+        json={"user_id": users[5].id},
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/organizations/not-an-id/members",
+        headers=alpha_headers,
+        json={"user_id": users[5].id},
+    ).status_code == 422
+    assert client.post(
+        members_path,
+        headers=alpha_headers,
+        json={"user_id": "not-an-id"},
+    ).status_code == 422
+    assert client.post(
+        members_path,
+        headers=alpha_headers,
+        json={"user_id": users[5].id, "role": "admin"},
+    ).status_code == 422
+
     discovery = client.get("/api/v1/resource-sharing/resources", headers=alpha_headers)
     assert discovery.status_code == 200
     assert {item["id"] for item in discovery.json()} == {resource.id}
@@ -256,5 +325,9 @@ try:
 
     print("Phase 5B smoke test passed")
 finally:
-    app.dependency_overrides.pop(get_db, None)
+    if had_get_db_override:
+        app.dependency_overrides[get_db] = previous_get_db_override
+    else:
+        app.dependency_overrides.pop(get_db, None)
     db.close()
+    engine.dispose()
